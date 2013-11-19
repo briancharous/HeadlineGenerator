@@ -42,6 +42,7 @@ class headlineDownloader:
 			if not quiet:
 				sys.stdout.write('\rSearching for %s' % curDate.strftime('%Y-%m-%d'))
 				sys.stdout.flush()
+			logging.info('Searching for feed on %s' % curDate.strftime('%Y-%m-%d'))
 			try:
 				epoch = calendar.timegm(curDate.timetuple())
 				newUrl = self.getURLFromWaybackMachineNearDate(epoch, rssurl)
