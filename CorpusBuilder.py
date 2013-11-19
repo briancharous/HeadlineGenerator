@@ -10,48 +10,26 @@ import logging
 
 class headlineDownloader:
 
-	def getURLFromWaybackMachineNearDate(self, date, rssurl):
-		payload = {'url': rssurl, 'timestamp': date}
-		r = requests.get("http://archive.org/wayback/available", params = payload)
-		if r.status_code == requests.codes.ok:
-			j = r.json()
-			if 'archived_snapshots' in j:
-				j = j['archived_snapshots']
-				if 'closest' in j:
-					snapshots = j['closest']
-					available = snapshots['available']
-					status = snapshots['status'] == '200'
-					if available and status:
-						return snapshots['url']
-
-		raise WaybackUnavailableException("Wayback didn't return a snapshot url")
-
 	def getURLSFromWaybackMachineInDateRange(self, start, end, rssurl, quiet = False):
-
+		origurl = rssurl
 		if rssurl[0:7] == 'http://':
 			# strip off http:// since the wayback machine doesn't want it and will return false if it gets that
 			rssurl = rssurl[7:]
+		elif rssurl[0:8] == 'https://':
+			rssurl = rssurl[8:]
 
 		urls = []
 
 		logging.info('Searching for feeds for %s' % rssurl)
-
-		curDate = start
-		delta = datetime.timedelta(days=1)
-		while curDate <= end:
-			if not quiet:
-				sys.stdout.write('\rSearching for %s' % curDate.strftime('%Y-%m-%d'))
-				sys.stdout.flush()
-			logging.info('Searching for feed on %s' % curDate.strftime('%Y-%m-%d'))
-			try:
-				epoch = calendar.timegm(curDate.timetuple())
-				newUrl = self.getURLFromWaybackMachineNearDate(epoch, rssurl)
-				urls.append(newUrl)
-			except WaybackUnavailableException, e:
-				print 'INFO: No snapshot found on ', curDate
-				logging.warning('No snapshot found on %s for url %s' % (curDate.strftime('%Y-%m-%d'), rssurl))
-
-			curDate += delta
+		startDate = start.strftime('%Y%m%d')
+		endDate = end.strftime('%Y%m%d')
+		payload = {'url': rssurl, 'filter' : 'statuscode:200', 'fl' : 'timestamp', 'from' : startDate, 'end' : endDate}
+		r = requests.get('http://web.archive.org/cdx/search/cdx', params = payload)
+		if r.status_code == requests.codes.ok:
+			timestamps = r.text.split() # api call returns plain text of timestamps separated by newline characters
+			for timestamp in timestamps:
+				url = 'https://web.archive.org/web/%s/%s' % (timestamp, origurl)
+				urls.append(url)
 
 		if not quiet:
 			sys.stdout.write('\r')
@@ -102,9 +80,8 @@ class headlineDownloader:
 		self.cursor = self.dbcon.cursor()
 		self.createHeadlinesTable()
 		logging.basicConfig(filename='status.log', level=logging.INFO)
-
-class WaybackUnavailableException(Exception):
-	pass
+		requests_log = logging.getLogger('requests')
+		requests_log.setLevel(logging.WARNING)
 
 def main():
 	parser = argparse.ArgumentParser()
