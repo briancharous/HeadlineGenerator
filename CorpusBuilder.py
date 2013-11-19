@@ -6,6 +6,7 @@ import json
 import datetime
 import argparse
 import sys
+import logging
 
 class headlineDownloader:
 
@@ -33,6 +34,8 @@ class headlineDownloader:
 
 		urls = []
 
+		logging.info('Searching for feeds for %s' % rssurl)
+
 		curDate = start
 		delta = datetime.timedelta(days=1)
 		while curDate <= end:
@@ -45,12 +48,16 @@ class headlineDownloader:
 				urls.append(newUrl)
 			except WaybackUnavailableException, e:
 				print 'INFO: No snapshot found on ', curDate
+				logging.warning('No snapshot found on %s for url %s' % (curDate.strftime('%Y-%m-%d'), rssurl))
 
 			curDate += delta
 
 		if not quiet:
 			sys.stdout.write('\r')
 			sys.stdout.flush()
+
+		logging.info('Found %i urls for %s' % (len(urls), rssurl))
+
 		return urls
 
 	def downloadHeadlinesFromURL(self, rssurl, baseurl):
@@ -62,6 +69,7 @@ class headlineDownloader:
 		rssurl and baserul can be the same, but if dealing with the Wayback Machine, baseurl is the url that gets
 		inserted into the database, rssurl is the location of the url in the Wayback Machine
 		"""
+		logging.info('Downloading feed %s' % rssurl)
 		fp = feedparser.parse(rssurl)
 		for entry in fp.entries:
 			headline = entry.title
@@ -92,6 +100,7 @@ class headlineDownloader:
 		self.openDBConnection()
 		self.cursor = self.dbcon.cursor()
 		self.createHeadlinesTable()
+		logging.basicConfig(filename='status.log', level=logging.INFO)
 
 class WaybackUnavailableException(Exception):
 	pass
@@ -126,6 +135,7 @@ def main():
 		sys.stdout.write('\r')
 		sys.stdout.flush()
 		print 'Downloaded headlines from %i snapshots of %s' % (len(urls),  baseurl) 
+	logging.info('Downloaded headlines from %i snapshots of %s' % (len(urls),  baseurl))
 
 if __name__ == '__main__':
 	main()
