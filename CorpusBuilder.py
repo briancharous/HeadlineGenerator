@@ -23,7 +23,7 @@ class headlineDownloader:
 		logging.info('Searching for feeds for %s' % rssurl)
 		startDate = start.strftime('%Y%m%d')
 		endDate = end.strftime('%Y%m%d')
-		payload = {'url': rssurl, 'filter' : 'statuscode:200', 'fl' : 'timestamp', 'from' : startDate, 'end' : endDate}
+		payload = {'url': rssurl, 'fl' : 'timestamp', 'from' : startDate, 'end' : endDate}
 		r = requests.get('http://web.archive.org/cdx/search/cdx', params = payload)
 		if r.status_code == requests.codes.ok:
 			timestamps = r.text.split() # api call returns plain text of timestamps separated by newline characters
