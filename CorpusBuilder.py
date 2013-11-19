@@ -25,7 +25,7 @@ class headlineDownloader:
 
 		raise WaybackUnavailableException("Wayback didn't return a snapshot url")
 
-	def getURLSFromWaybackMachineInDateRange(self, start, end, rssurl):
+	def getURLSFromWaybackMachineInDateRange(self, start, end, rssurl, quiet = False):
 
 		if rssurl[0:7] == 'http://':
 			# strip off http:// since the wayback machine doesn't want it and will return false if it gets that
@@ -36,6 +36,9 @@ class headlineDownloader:
 		curDate = start
 		delta = datetime.timedelta(days=1)
 		while curDate <= end:
+			if not quiet:
+				sys.stdout.write('\rSearching for %s' % curDate.strftime('%Y-%m-%d'))
+				sys.stdout.flush()
 			try:
 				epoch = calendar.timegm(curDate.timetuple())
 				newUrl = self.getURLFromWaybackMachineNearDate(epoch, rssurl)
@@ -45,6 +48,9 @@ class headlineDownloader:
 
 			curDate += delta
 
+		if not quiet:
+			sys.stdout.write('\r')
+			sys.stdout.flush()
 		return urls
 
 	def downloadHeadlinesFromURL(self, rssurl, baseurl):
@@ -107,7 +113,7 @@ def main():
 	now = datetime.datetime.now()
 	if not quiet:
 		print 'Searching the Wayback Machine for urls...'
-	urls = h.getURLSFromWaybackMachineInDateRange(startDate, endDate, baseurl)
+	urls = h.getURLSFromWaybackMachineInDateRange(startDate, endDate, baseurl, quiet)
 	if not quiet:
 		print 'Found %i urls in date range' % len(urls)
 		print 'Downloading feeds...'
