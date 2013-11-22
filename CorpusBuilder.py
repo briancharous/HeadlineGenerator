@@ -15,7 +15,7 @@ class LanguageModel(object):
 			(?P<abbreviation>\b(?:Mr.|Mrs.|Pres.|pres.)) |
 			(?P<wordAp>\b\w+'\w*\b) |
 			(?P<word>\b\w+\b) |
-			(?P<punctuation>[,\.\?\!])
+			(?P<punctuation>[\,\.\?\!\-\:\;\&\@\$])
 			""", re.DOTALL | re.VERBOSE)
 
 		tokens = []
@@ -33,10 +33,10 @@ class LanguageModel(object):
 			if punctuation:
 				token = match.group('punctuation')
 			if token is not None:
-				tokens.append(token.lower())
+				tokens.append(token)
 
-		if tokens and (tokens[-1] != '?' or tokens[-1] != '!' or tokens[-1] != '.'):
-			tokens.append('.')
+		if tokens:
+			tokens.append('<END>')
 
 		return tokens
 
@@ -94,6 +94,34 @@ class LanguageModel(object):
 		headlines = self.getHeadlinesFromDatabaseInDateRange(startdate, enddate)
 		for headline in headlines:
 			self.addHeadlineToModel(headline)
+
+	def getProbabilitiesOfTrigrams(self, word1, word2, potentialWords):
+
+		probabilities = []
+		for potential in potentialWords:
+			trigram = (word1, word2, potential)
+			trigramcount = self.trigramCounts.get(trigram, 0)
+			bigram = (word1, word2)
+			bigramcount = self.bigramCounts.get(bigram, 0)
+			assert bigramcount != 0
+			probability = float(trigramcount)/bigramcount
+			probabilities.append((potential, probability))
+
+		return probabilities
+
+	def getProbabilitiesOfBigrams(self, word, potentialWords):
+
+		probabilities = []
+		for potential in potentialWords:
+			bigram = (word, potential)
+			bigramcount = self.bigramCounts.get(bigram, 0)
+			unigramcount = self.unigramCounts.get(word, 0)
+			assert unigramcount != 0
+			probability = float(bigramcount)/unigramcount
+			probabilities.append((potential, probability))
+
+		return probabilities
+
 
 	def openDBConnection(self):
 		self.dbcon = sqlite3.connect('headlines.db')

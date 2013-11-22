@@ -2,11 +2,11 @@ from CorpusBuilder import LanguageModel
 import marshal
 import random
 import sys
-
+import re
 
 class BadSeedException(Exception):
 	pass
-	
+
 def readLanguageModel(filename):
 	with open(filename, 'r') as f:
 		model = LanguageModel()
@@ -25,15 +25,25 @@ def getNextToken(currentTokens, model):
 		if (previousBigram[0], previousBigram[1]) in model.possibleWordsGivenBigram:
 			possibleWords = list(model.possibleWordsGivenBigram[(previousBigram[0], previousBigram[1])])
 			if possibleWords:
-				rand = random.randint(0, len(possibleWords)-1)
-				return possibleWords[rand]
+				probs = model.getProbabilitiesOfTrigrams(previousBigram[0], previousBigram[1], possibleWords)
+				sortedByProbs = sorted(probs, key = lambda tup: tup[1])
+				top = sortedByProbs[0:20]
+
+				rand = random.randint(0, len(top) - 1)
+				return sortedByProbs[rand][0]
 
 	previousUnigram = currentTokens[-1]
 	if previousUnigram in model.possibleWordsGivenUnigram:
 		possibleWords = list(model.possibleWordsGivenUnigram[previousUnigram])
 		if possibleWords:
-			rand = random.randint(0, len(possibleWords) - 1)
-			return possibleWords[rand]
+			probs = model.getProbabilitiesOfBigrams(previousUnigram, possibleWords)
+			sortedByProbs = sorted(probs, key = lambda tup: tup[1], reverse = True)
+			top = sortedByProbs[0:20]
+
+			rand = random.randint(0, len(top) - 1)
+			return sortedByProbs[rand][0]
+			# rand = random.randint(0, len(possibleWords) - 1)
+			# return possibleWords[rand]
 
 	raise BadSeedException()
 
@@ -44,9 +54,21 @@ def generateHeadlines(seed, model):
 		next = getNextToken(tokens, model)
 		tokens.append(next)
 		# print tokens
-		if next == '.' or next == '!' or next == '?':
+		if next == '<END>':
 			break
-	return ' '.join(tokens)
+
+	sentence = ""
+	regex = re.compile(r'[A-z0-9]')
+	for i, token in enumerate(tokens[:-1]):
+		if regex.match(token):
+			# word found, put spaces
+			if not (tokens[i-1] == "$" or tokens[i-1] == "-"):
+				sentence = sentence + " " + token
+			else: 
+				sentence = sentence + token
+		else:
+			sentence = sentence + token
+	return sentence[1:]
 
 def main():
 	print "Reading language model"
