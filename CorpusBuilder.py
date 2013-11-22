@@ -1,119 +1,140 @@
-import feedparser
-import sqlite3
-import calendar
-import requests
-import json
-import datetime
 import argparse
-import sys
-import logging
+import sqlite3
+import datetime
+import calendar
+import re
+from collections import Set
+import marshal
 
-class headlineDownloader:
+class LanguageModel(object):
 
-	def getURLSFromWaybackMachineInDateRange(self, start, end, rssurl, quiet = False):
-		origurl = rssurl
-		if rssurl[0:7] == 'http://':
-			# strip off http:// since the wayback machine doesn't want it and will return false if it gets that
-			rssurl = rssurl[7:]
-		elif rssurl[0:8] == 'https://':
-			rssurl = rssurl[8:]
+	def tokenizeHeadline(self, headline):
+		groups = re.compile(r"""
+			(?P<whitespace>\s+) |
+			(?P<acronym>(?:\w\.){2,}) |
+			(?P<abbreviation>\b(?:Mr.|Mrs.|Pres.|pres.)) |
+			(?P<wordAp>\b\w+'\w*\b) |
+			(?P<word>\b\w+\b) |
+			(?P<punctuation>[,\.\?\!])
+			""", re.DOTALL | re.VERBOSE)
 
-		urls = []
+		tokens = []
+		for match in re.finditer(groups, headline):
+			whitespace, acronym, abbreviation, wordAp, word, punctuation = match.groups()
+			token = None
+			if abbreviation:
+				token = match.group('abbreviation')
+			if acronym:
+				token = match.group('acronym')
+			if wordAp:
+				token = match.group('wordAp')
+			if word:
+				token = match.group('word')
+			if punctuation:
+				token = match.group('punctuation')
+			if token is not None:
+				tokens.append(token.lower())
 
-		logging.info('Searching for feeds for %s' % rssurl)
-		startDate = start.strftime('%Y%m%d')
-		endDate = end.strftime('%Y%m%d')
-		payload = {'url': rssurl, 'fl' : 'timestamp', 'from' : startDate, 'end' : endDate}
-		r = requests.get('http://web.archive.org/cdx/search/cdx', params = payload)
-		if r.status_code == requests.codes.ok:
-			timestamps = r.text.split() # api call returns plain text of timestamps separated by newline characters
-			for timestamp in timestamps:
-				url = 'https://web.archive.org/web/%s/%s' % (timestamp, origurl)
-				urls.append(url)
+		if tokens and (tokens[-1] != '?' or tokens[-1] != '!' or tokens[-1] != '.'):
+			tokens.append('.')
 
-		if not quiet:
-			sys.stdout.write('\r')
-			sys.stdout.flush()
+		return tokens
 
-		logging.info('Found %i urls for %s' % (len(urls), rssurl))
+	def addHeadlineToModel(self, headline):
 
-		return urls
+		tokens = self.tokenizeHeadline(headline)
 
-	def downloadHeadlinesFromURL(self, rssurl, baseurl):
-		""" 
-		Download and parse an RSS feed and store the headlines in the database
-		baseurl is the url of the live feed
-		rssurl is the url where the feed is located
+		# count unigrams
+		for token in tokens:
+			occurrences = self.unigramCounts.get(token, 0)
+			occurrences += 1
+			self.unigramCounts[token] = occurrences
 
-		rssurl and baserul can be the same, but if dealing with the Wayback Machine, baseurl is the url that gets
-		inserted into the database, rssurl is the location of the url in the Wayback Machine
-		"""
-		logging.info('Downloading feed %s' % rssurl)
-		fp = feedparser.parse(rssurl)
-		for entry in fp.entries:
-			headline = entry.title
-			pubDate = calendar.timegm(entry.published_parsed) # convert to unix time UTC
-			storyURL = entry.link
-			query = "INSERT OR REPLACE INTO headlines (headline, date, feedURL, linkURL) VALUES (?, ?, ?, ?)"
-			self.cursor.execute(query, (headline, pubDate, baseurl, storyURL))
-		self.dbcon.commit()
+		# count bigrams
+		for i in xrange(0, len(tokens) - 1):
+			t1 = tokens[i]
+			t2 = tokens[i+1]
+			bigram = (t1, t2)
+			occurrences = self.bigramCounts.get(bigram, 0)
+			occurrences += 1
+			self.bigramCounts[bigram] = occurrences
 
-	def createHeadlinesTable(self):
-		"""
-		Create a table in the database to store the headlines if it does not exist
-		"""
-		query = "CREATE TABLE IF NOT EXISTS headlines (headline TEXT NOT NULL, date INTEGER, feedURL TEXT, linkURL text NOT NULL, PRIMARY KEY (headline, linkURL))"
-		self.cursor.execute(query)	
-		self.dbcon.commit()
+			curPossibleWords = self.possibleWordsGivenUnigram.get(t1, set())
+			curPossibleWords.add(t2)
+			self.possibleWordsGivenUnigram[t1] = curPossibleWords
 
-	def closeDBConnection(self):
-		""" shutdown the connection to the database """
-		self.dbcon.close()
+		# count trigrams
+		for i in xrange(0, len(tokens) - 2):
+			t1 = tokens[i]
+			t2 = tokens[i+1]
+			t3 = tokens[i+2]
+			trigram = (t1, t2, t3)
+			occurrences = self.trigramCounts.get(trigram, 0)
+			occurrences += 1
+			self.trigramCounts[trigram] = occurrences
+
+			curPossibleWords = self.possibleWordsGivenBigram.get((t1, t2), set())
+			curPossibleWords.add(t3)
+			self.possibleWordsGivenBigram[(t1, t2)] = curPossibleWords
+
+	def getHeadlinesFromDatabaseInDateRange(self, startdate, enddate):
+		""" Get a list of headlines from the SQLite database in between startdate and enddate datetime objects """
+
+		startUnixTime = calendar.timegm(startdate.timetuple())
+		endUnixTime = calendar.timegm(enddate.timetuple())
+		query = "SELECT headline FROM headlines WHERE date > ? AND date < ?"
+
+		headlines = []
+		for row in self.cursor.execute(query, (startUnixTime, endUnixTime)):
+			headlines.append(row[0])
+
+		return headlines
+
+	def buildModelInDateRange(self, startdate, enddate):
+		headlines = self.getHeadlinesFromDatabaseInDateRange(startdate, enddate)
+		for headline in headlines:
+			self.addHeadlineToModel(headline)
 
 	def openDBConnection(self):
-		""" open a connection to the database """
 		self.dbcon = sqlite3.connect('headlines.db')
+
+	def closeDBConnection(self):
+		self.dbcon.close()
 
 	def __init__(self):
 		self.dbcon = None
 		self.openDBConnection()
 		self.cursor = self.dbcon.cursor()
-		self.createHeadlinesTable()
-		logging.basicConfig(filename='status.log', level=logging.INFO)
-		requests_log = logging.getLogger('requests')
-		requests_log.setLevel(logging.WARNING)
+		self.trigramCounts = {}
+		self.bigramCounts = {}
+		self.unigramCounts = {}
+		self.possibleWordsGivenBigram = {}
+		self.possibleWordsGivenUnigram = {}
 
 def main():
 	parser = argparse.ArgumentParser()
-	parser.add_argument('-s', '--start_date', required = True, help = 'Date to start downloading feeds. Formatted YYYY-mm-dd')
-	parser.add_argument('-e', '--end_date', required = True, help = 'Date to stop downloading feeds. Formatted YYYY-mm-dd')
-	parser.add_argument('-f', '--feed', required = True, help = 'URL of rss feed')
-	parser.add_argument('-q', '--quiet', required = False, action = 'store_true', help = 'Do not produce any output')
+	parser.add_argument('-s', '--start_date', required = True, help = 'Start date of headlines to build corpus from. Formatted YYYY-mm-dd')
+	parser.add_argument('-e', '--end_date', required = True, help = 'End date of headlines to build corpus from. Formatted YYYY-mm-dd')
+	parser.add_argument('-o', '--output', required = True, help = 'filename of output file')
 	args = parser.parse_args()
 
 	startDate = datetime.datetime.strptime(args.start_date, '%Y-%m-%d')
 	endDate = datetime.datetime.strptime(args.end_date, '%Y-%m-%d')
-	baseurl = args.feed
-	quiet = args.quiet
+	outputName = args.output
 
-	h = headlineDownloader()
-	now = datetime.datetime.now()
-	if not quiet:
-		print 'Searching the Wayback Machine for urls...'
-	urls = h.getURLSFromWaybackMachineInDateRange(startDate, endDate, baseurl, quiet)
-	if not quiet:
-		print 'Found %i urls in date range' % len(urls)
-		print 'Downloading feeds...'
-	for i, url in enumerate(urls):
-		if not quiet:
-			sys.stdout.write('\r%i/%i' % (i+1, len(urls))) 
-			sys.stdout.flush()
-		h.downloadHeadlinesFromURL(url, baseurl)
-	if not quiet:
-		sys.stdout.write('\r')
-		sys.stdout.flush()
-		print 'Downloaded headlines from %i snapshots of %s' % (len(urls),  baseurl) 
-	logging.info('Downloaded headlines from %i snapshots of %s' % (len(urls),  baseurl))
+	model = LanguageModel()
+	print "Building language model"
+	model.buildModelInDateRange(startDate, endDate)
+	model.closeDBConnection()
+
+	try:
+		print "Writing to file"
+		with open(outputName, 'w') as f:
+			toMarshal = [model.trigramCounts, model.bigramCounts, model.unigramCounts, model.possibleWordsGivenBigram, model.possibleWordsGivenUnigram]
+			marshal.dump(toMarshal, f, 2)
+			print "Language model written to %s" % outputName
+	except IOError, e:
+		print e
 
 if __name__ == '__main__':
 	main()
