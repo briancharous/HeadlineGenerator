@@ -26,7 +26,9 @@ class TwitterBot:
 			rand = random.randint(0, len(topics)-1)
 			topic = topics[rand]
 			try:
-				return HeadlineGenerator.generateHeadlines(topic, self.model)
+				headline = HeadlineGenerator.generateHeadlines(topic, self.model)
+				if headline != topic:
+					return headline
 			except HeadlineGenerator.BadSeedException:
 				logging.info("%s not in corpus", topic)
 				topics.remove(topic)
