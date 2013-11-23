@@ -29,6 +29,8 @@ class TwitterBot:
 				headline = HeadlineGenerator.generateHeadlines(topic, self.model)
 				if headline != topic:
 					return headline
+				else:
+					return None
 			except HeadlineGenerator.BadSeedException:
 				logging.info("%s not in corpus", topic)
 				topics.remove(topic)
