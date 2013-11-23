@@ -28,9 +28,19 @@ def getNextToken(currentTokens, model):
 				probs = model.getProbabilitiesOfTrigrams(previousBigram[0], previousBigram[1], possibleWords)
 				sortedByProbs = sorted(probs, key = lambda tup: tup[1])
 				top = sortedByProbs[0:20]
-
+				if len(currentTokens) < 8 and len(top) > 1:
+					try:
+						endIndex = [token[0] for token in top].index('<END>')
+						del top[endIndex]
+					except ValueError, e:
+						pass
+				if not top:
+					# print currentTokens
+					currentTokens[-1] = getNextToken(currentTokens[:-1], model)
+					# print currentTokens
+					return getNextToken(currentTokens, model)
 				rand = random.randint(0, len(top) - 1)
-				return sortedByProbs[rand][0]
+				return top[rand][0]
 
 	previousUnigram = currentTokens[-1]
 	if previousUnigram in model.possibleWordsGivenUnigram:
@@ -39,11 +49,20 @@ def getNextToken(currentTokens, model):
 			probs = model.getProbabilitiesOfBigrams(previousUnigram, possibleWords)
 			sortedByProbs = sorted(probs, key = lambda tup: tup[1], reverse = True)
 			top = sortedByProbs[0:20]
-
+			if len(currentTokens) < 8 and len(top) > 1:
+				try:
+					endIndex = [token[0] for token in top].index('<END>')
+					del top[endIndex]
+				except ValueError, e:
+					pass
+			if not top:
+				# print currentTokens
+				currentTokens[-1] = getNextToken(currentTokens[:-1], model)
+				# print currentTokens
+				return getNextToken(currentTokens, model)
 			rand = random.randint(0, len(top) - 1)
-			return sortedByProbs[rand][0]
-			# rand = random.randint(0, len(possibleWords) - 1)
-			# return possibleWords[rand]
+			return top[rand][0]
+
 
 	raise BadSeedException()
 
@@ -58,7 +77,7 @@ def generateHeadlines(seed, model):
 			break
 
 	sentence = ""
-	regex = re.compile(r'[A-z0-9]')
+	regex = re.compile(r'[A-z0-9$&]')
 	for i, token in enumerate(tokens[:-1]):
 		if regex.match(token):
 			# word found, put spaces
@@ -75,7 +94,10 @@ def main():
 	model = readLanguageModel(sys.argv[1])
 	while True:
 		seed = raw_input("Seed: ")
-		print generateHeadlines(seed, model)
+		try:
+			print generateHeadlines(seed, model)
+		except BadSeedException:
+			print "Error: seed '%s' not found in corpus" % seed
 
 if __name__ == '__main__':
 	main()

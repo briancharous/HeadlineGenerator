@@ -4,3 +4,5 @@ syntax: glob
 *.log
 Proposal.txt
 *.model
+*.jpg
+*.key
