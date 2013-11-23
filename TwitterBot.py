@@ -4,6 +4,7 @@ import feedparser
 import random
 import twitter
 from time import sleep
+import sys
 
 class TwitterBot:
 
@@ -41,8 +42,9 @@ class TwitterBot:
 
 
 def main():
+	modelname = sys.argv[1]
 	while True:
-		t = TwitterBot('test.model')
+		t = TwitterBot(modelname)
 		t.postToTwitter()
 		sleep(600)
 
