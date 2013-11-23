@@ -30,7 +30,7 @@ class TwitterBot:
 				if headline != topic:
 					return headline
 				else:
-					return None
+					logging.info("not enough data to generate headline for seed %s" % topic)
 			except HeadlineGenerator.BadSeedException:
 				logging.info("%s not in corpus", topic)
 				topics.remove(topic)
