@@ -50,8 +50,8 @@ class TwitterBot:
 
 def main():
 	modelname = sys.argv[1]
+	t = TwitterBot(modelname)
 	while True:
-		t = TwitterBot(modelname)
 		t.postToTwitter()
 		sleep(600)
 
