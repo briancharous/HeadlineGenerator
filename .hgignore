@@ -3,7 +3,6 @@ syntax: glob
 *.db
 *.log
 Proposal.txt
-*.model
 *.jpg
 *.key
 *.pages
