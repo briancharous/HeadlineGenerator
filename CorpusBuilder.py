@@ -1,3 +1,11 @@
+"""
+CorpusBuilder.py
+Brian Charous
+
+This file generates a corpus given a SQLite database of headlines
+"""
+
+
 import argparse
 import sqlite3
 import datetime
@@ -5,10 +13,12 @@ import calendar
 import re
 from collections import Set
 import marshal
+import pattern.en as pattern
 
 class LanguageModel(object):
 
 	def tokenizeHeadline(self, headline):
+		""" deprecated tokenzier. now using pattern's tokenizer """
 		groups = re.compile(r"""
 			(?P<whitespace>\s+) |
 			(?P<acronym>(?:\w\.){2,}) |
@@ -41,8 +51,26 @@ class LanguageModel(object):
 		return tokens
 
 	def addHeadlineToModel(self, headline):
+		""" 
+		Count trigrams, bigrams, unigrams, tag sequences, and add them to the model for a given headline
+		"""
 
-		tokens = self.tokenizeHeadline(headline)
+		tags = pattern.tag(headline, tokenize = True)
+
+		tokens = []
+
+		if tags:
+			tags.append(('<END>', '<END>'))
+
+		weirdpunctuation = re.compile(r'\`|\"|\[|\]|\(|\)|\{|\}')
+
+		for i, tag in enumerate(tags):
+			# remove quotes, brackets
+			if weirdpunctuation.match(tag[0]):
+				del tags[i]
+		
+		for tag in tags:	
+			tokens.append(tag[0])
 
 		# count unigrams
 		for token in tokens:
@@ -77,6 +105,36 @@ class LanguageModel(object):
 			curPossibleWords.add(t3)
 			self.possibleWordsGivenBigram[(t1, t2)] = curPossibleWords
 
+
+		#count tags
+
+		for tagTouple in tags:
+			tag = tagTouple[1]
+			word = tagTouple[0]
+
+			# count number of times word occurs as tag
+			# dict of dicts
+			# {word : {tag : tagcount}}
+			tagCounts = self.tagCountsForWord.get(word, {})
+			tagCount = tagCounts.get(tag, 0)
+			tagCount += 1
+			tagCounts[tag] = tagCount
+			self.tagCountsForWord[word] = tagCounts
+
+			# count raw tag counts
+			curTagCount = self.tagCounts.get(tag, 0)
+			curTagCount += 1
+			self.tagCounts[tag] = curTagCount
+
+		# count tag sequeunces
+		for i in xrange(0, len(tags) - 1):
+			prevTag = tags[i][1]
+			curTag = tags[i+1][1]
+			tagSequence = (prevTag, curTag)
+			occurrences = self.tagSequenceCounts.get(tagSequence, 0)
+			occurrences += 1
+			self.tagSequenceCounts[tagSequence] = occurrences
+
 	def getHeadlinesFromDatabaseInDateRange(self, startdate, enddate):
 		""" Get a list of headlines from the SQLite database in between startdate and enddate datetime objects """
 
@@ -96,6 +154,9 @@ class LanguageModel(object):
 			self.addHeadlineToModel(headline)
 
 	def getProbabilitiesOfTrigrams(self, word1, word2, potentialWords):
+		"""
+		Given two words and a list of potential words, computes the probabilities that each word in potential words comes next
+		"""
 
 		probabilities = []
 		for potential in potentialWords:
@@ -104,12 +165,15 @@ class LanguageModel(object):
 			bigram = (word1, word2)
 			bigramcount = self.bigramCounts.get(bigram, 0)
 			assert bigramcount != 0
-			probability = float(trigramcount)/bigramcount
+			probability = (float(trigramcount)/bigramcount) * self.probabilityOfTagToWord(self.mostProbableTagForWord(word2), potential)
 			probabilities.append((potential, probability))
 
 		return probabilities
 
 	def getProbabilitiesOfBigrams(self, word, potentialWords):
+		"""
+		Given a and a list of potential words, computes the probabilities that each word in potential words comes next
+		"""
 
 		probabilities = []
 		for potential in potentialWords:
@@ -117,11 +181,37 @@ class LanguageModel(object):
 			bigramcount = self.bigramCounts.get(bigram, 0)
 			unigramcount = self.unigramCounts.get(word, 0)
 			assert unigramcount != 0
-			probability = float(bigramcount)/unigramcount
+			probability = (float(bigramcount)/unigramcount) * self.probabilityOfTagToWord(self.mostProbableTagForWord(word), potential)
 			probabilities.append((potential, probability))
-
 		return probabilities
 
+	def mostProbableTagForWord(self, word):
+		"""
+		Returns the most likely tag for a given word
+		"""
+
+		tagsForWord = self.tagCountsForWord.get(word, {})
+		highest = 0
+		mostLikelyTag = None
+		for tag, tagCount in tagsForWord.iteritems():
+			if tagCount > highest:
+				highest = tagCount
+				mostLikelyTag = tag
+
+		return mostLikelyTag
+
+	def probabilityOfTagToWord(self, tag, word):
+		"""
+		Compute probability that a known tag goes to a potential word
+		"""
+
+		tagForWord = self.mostProbableTagForWord(word)
+		if not tagForWord:
+			return 0
+		tagToTagCount = self.tagSequenceCounts.get((tag, tagForWord), 0)
+		totalTagCount = self.tagCounts[tag]
+		prob = float(tagToTagCount)/float(totalTagCount)
+		return prob
 
 	def openDBConnection(self):
 		self.dbcon = sqlite3.connect('headlines.db')
@@ -138,6 +228,9 @@ class LanguageModel(object):
 		self.unigramCounts = {}
 		self.possibleWordsGivenBigram = {}
 		self.possibleWordsGivenUnigram = {}
+		self.tagCounts = {}
+		self.tagCountsForWord = {}
+		self.tagSequenceCounts = {}
 
 def main():
 	parser = argparse.ArgumentParser()
@@ -150,15 +243,19 @@ def main():
 	endDate = datetime.datetime.strptime(args.end_date, '%Y-%m-%d')
 	outputName = args.output
 
+	starttime = datetime.datetime.now()
 	model = LanguageModel()
 	print "Building language model"
 	model.buildModelInDateRange(startDate, endDate)
 	model.closeDBConnection()
 
 	try:
+		endtime = datetime.datetime.now()
+		timediff = endtime - starttime
+		print "Language model computation took %s seconds" % timediff.seconds
 		print "Writing to file"
 		with open(outputName, 'w') as f:
-			toMarshal = [model.trigramCounts, model.bigramCounts, model.unigramCounts, model.possibleWordsGivenBigram, model.possibleWordsGivenUnigram]
+			toMarshal = [model.trigramCounts, model.bigramCounts, model.unigramCounts, model.possibleWordsGivenBigram, model.possibleWordsGivenUnigram, model.tagCounts, model.tagCountsForWord, model.tagSequenceCounts]
 			marshal.dump(toMarshal, f, 2)
 			print "Language model written to %s" % outputName
 	except IOError, e:

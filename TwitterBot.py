@@ -1,3 +1,12 @@
+"""
+TwitterBot.py
+Brian Charous
+
+This program implements the Headline Generator and posts the headlines it generates to Twitter using a randomly
+selected Google trending topic as the seed
+"""
+
+
 import HeadlineGenerator
 import requests
 import feedparser
@@ -10,6 +19,10 @@ import logging
 class TwitterBot:
 
 	def getGoogleTrending(self):
+		""" 
+		Get a list of trending topics on Google to use as a seed
+		"""
+
 		topics = []
 		fp = feedparser.parse("http://www.google.com/trends/hottrends/atom/feed")
 		for entry in fp.entries:
@@ -19,6 +32,9 @@ class TwitterBot:
 		return topics
 
 	def generateHeadline(self):
+		"""
+		Make the headline
+		"""
 
 		topics = self.getGoogleTrending()
 		
@@ -40,6 +56,9 @@ class TwitterBot:
 				return None
 
 	def postToTwitter(self):
+		"""
+		Make a headline and send the headline off to twitter
+		"""
 
 		headline = self.generateHeadline()
 		if headline:

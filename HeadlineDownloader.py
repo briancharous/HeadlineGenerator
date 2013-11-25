@@ -1,3 +1,10 @@
+"""
+HeadlineDownloader.py 
+Brian Charous
+
+This script downloads old RSS feeds from the Wayback Machine and stores the headlines in a SQLite database.
+"""
+
 import feedparser
 import sqlite3
 import calendar
@@ -11,6 +18,10 @@ import logging
 class headlineDownloader:
 
 	def getURLSFromWaybackMachineInDateRange(self, start, end, rssurl, quiet = False):
+		"""
+		Get a list of URLs of feeds in the Wayback Machine between two datetime objects
+		"""
+
 		origurl = rssurl
 		if rssurl[0:7] == 'http://':
 			# strip off http:// since the wayback machine doesn't want it and will return false if it gets that
@@ -48,6 +59,7 @@ class headlineDownloader:
 		rssurl and baserul can be the same, but if dealing with the Wayback Machine, baseurl is the url that gets
 		inserted into the database, rssurl is the location of the url in the Wayback Machine
 		"""
+		
 		logging.info('Downloading feed %s' % rssurl)
 		fp = feedparser.parse(rssurl)
 		for entry in fp.entries:
