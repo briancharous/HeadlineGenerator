@@ -67,7 +67,7 @@ class TwitterBot:
 
 	def __init__(self, modelFilename):
 		logging.basicConfig(filename = 'twitter_status.log', level = logging.INFO)
-		self.twitter = twitter.Api(consumer_key = 'Xdfb5x3sYS2Q8E7nYD6fw', consumer_secret = 'gETgfldkzFG1BpFVLcwa0pOo1V3P9vovh4MRAcl4s', access_token_key = '2210011554-xfUSAyljGxFt2h11uCQqOQuUA3UR8ZRkQJYRTNN', access_token_secret = 'StBOKpJZCUwmop63wvlnqFU4EUNPYE5ZSm1i4z3Gu6ZXG')
+		self.twitter = twitter.Api(consumer_key = '', consumer_secret = '', access_token_key = '', access_token_secret = '')
 		logging.info("reading %s" % modelFilename)
 		self.model = HeadlineGenerator.readLanguageModel(modelFilename)
 		logging.info("done reading model")
