@@ -11,7 +11,7 @@ app.config['DEBUG'] = False
 def printhello():
 	return "hello world"
 
-@app.route('/generate', methods=['GET'])
+@app.route('/generate', methods=['POST'])
 def genHeadline():
 	seed = request.form['seed']
 	result = ""
