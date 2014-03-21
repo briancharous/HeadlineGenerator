@@ -7,7 +7,11 @@ import logging
 app = Flask(__name__)
 app.config['DEBUG'] = False
 
-@app.route('/generate', methods=['POST', 'GET'])
+@app.route('/')
+def printhello():
+	return "hello world"
+
+@app.route('/generate', methods=['GET'])
 def genHeadline():
 	seed = request.form['seed']
 	result = ""
