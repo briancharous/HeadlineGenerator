@@ -20,7 +20,7 @@ class LanguageModel(object):
 	def tokenizeHeadline(self, headline):
 		""" deprecated tokenzier. now using pattern's tokenizer """
 		groups = re.compile(r"""
-			(?P<whitespace>\s+) |
+			(?P<whitesp ace>\s+) |
 			(?P<acronym>(?:\w\.){2,}) |
 			(?P<abbreviation>\b(?:Mr.|Mrs.|Pres.|pres.)) |
 			(?P<wordAp>\b\w+'\w*\b) |
