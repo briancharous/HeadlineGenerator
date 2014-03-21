@@ -15,6 +15,7 @@ def printhello():
 def genHeadline():
 	seed = request.form['seed']
 	result = ""
+	global model
 	try:
 		result = HeadlineGenerator.generateHeadlines(seed, model)
 	except HeadlineGenerator.BadSeedException:
