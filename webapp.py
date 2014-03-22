@@ -6,6 +6,7 @@ import logging
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
+model = None
 
 @app.route('/')
 def printhello():
