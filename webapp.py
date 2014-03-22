@@ -6,11 +6,8 @@ import logging
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
-modelname = 'headlines.model'
-# logging.info("reading %s" % modelname)
-# print "reading %s" % modelname
+modelname = 'headlinesxxsmall.model'
 model = HeadlineGenerator.readLanguageModel(modelname)
-
 
 @app.route('/')
 def printhello():
@@ -27,15 +24,6 @@ def genHeadline():
 	except HeadlineGenerator.BadSeedException:
 		result = "Seed %s not found in corpus" % seed
 	return jsonify(result=result)
-
-def main():
-	modelname = 'headlines.model'
-	# logging.info("reading %s" % modelname)
-	# print "reading %s" % modelname
-	global model
-	model = HeadlineGenerator.readLanguageModel(modelname)
-	# logging.info("done reading model")
-	# print "done reading model"
 
 if __name__ == '__main__':
 	app.run()
