@@ -16,6 +16,7 @@ def genHeadline():
 	seed = request.form['seed']
 	result = ""
 	global model
+	print type(model)
 	try:
 		result = HeadlineGenerator.generateHeadlines(seed, model)
 	except HeadlineGenerator.BadSeedException:
