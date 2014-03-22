@@ -6,7 +6,11 @@ import logging
 
 app = Flask(__name__)
 app.config['DEBUG'] = True
-model = None
+modelname = 'headlines.model'
+# logging.info("reading %s" % modelname)
+# print "reading %s" % modelname
+model = HeadlineGenerator.readLanguageModel(modelname)
+
 
 @app.route('/')
 def printhello():
@@ -34,5 +38,4 @@ def main():
 	# print "done reading model"
 
 if __name__ == '__main__':
-	main()
 	app.run()
