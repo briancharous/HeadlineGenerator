@@ -9,16 +9,11 @@ app.config['DEBUG'] = True
 modelname = 'headlinesxxsmall.model'
 model = HeadlineGenerator.readLanguageModel(modelname)
 
-@app.route('/')
-def printhello():
-	return "hello world"
-
 @app.route('/generate', methods=['POST'])
 def genHeadline():
 	seed = request.form['seed']
 	result = ""
 	global model
-	print type(model)
 	try:
 		result = HeadlineGenerator.generateHeadlines(seed, model)
 	except HeadlineGenerator.BadSeedException:
