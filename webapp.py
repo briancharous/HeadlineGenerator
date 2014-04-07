@@ -9,7 +9,7 @@ app.config['DEBUG'] = True
 modelname = 'headlinesxxsmall.model'
 model = HeadlineGenerator.readLanguageModel(modelname)
 
-@app.route('/generate', methods=['POST'])
+@app.route('/generate', methods=['POST', 'OPTIONS'])
 @crossdomain(origin='*')
 def genHeadline():
 	seed = request.form['seed']
