@@ -51,7 +51,7 @@ class LanguageModel(object):
 		return tokens
 
 	def addHeadlineToModel(self, headline):
-		""" 
+		"""
 		Count trigrams, bigrams, unigrams, tag sequences, and add them to the model for a given headline
 		"""
 
@@ -68,8 +68,8 @@ class LanguageModel(object):
 			# remove quotes, brackets
 			if weirdpunctuation.match(tag[0]):
 				del tags[i]
-		
-		for tag in tags:	
+
+		for tag in tags:
 			tokens.append(tag[0])
 
 		# count unigrams
