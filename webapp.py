@@ -2,6 +2,7 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 from flask import current_app
+from flask import make_response
 from functools import update_wrapper
 from datetime import timedelta  
 import HeadlineGenerator
